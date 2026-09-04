@@ -67,12 +67,38 @@
     <!-- STEP 3 : Exposure -->
     <section class="step" id="step3">
       <h2><span class="num">3</span> Exposure</h2>
-      <p class="hint">GeoTIFF of the asset at risk, e.g. WorldPop population count,
-        built-up area (WSF/GHSL) or agricultural land (ESA).</p>
-      <label class="dropzone" id="dzExposure">
-        <input type="file" id="fileExposure" accept=".tif,.tiff" hidden>
-        <span>Drop GeoTIFF here or <u>browse</u></span>
-      </label>
+      <p class="hint">What the flood acts upon. Download population automatically
+        by country, as CCDR-tools does, or upload your own raster.</p>
+      <div class="tabs">
+        <button type="button" class="tab active" id="tabAuto">Download by country</button>
+        <button type="button" class="tab" id="tabUpload">Upload a raster</button>
+      </div>
+
+      <div id="expAuto">
+        <div class="fieldrow">
+          <label>Country ISO3 code <span class="tip" title="Three-letter ISO country code, e.g. NGA (Nigeria), BGD (Bangladesh), MOZ (Mozambique). Fetches the WorldPop 2020 UN-adjusted constrained 100 m population count -- the same dataset CCDR-tools uses.">?</span>
+            <input type="text" id="iso3" placeholder="e.g. NGA" maxlength="3"
+                   autocapitalize="characters" spellcheck="false">
+          </label>
+          <label style="flex:0 0 auto;align-self:end">&nbsp;
+            <button type="button" class="ghost" id="fetchExp">Download population</button>
+          </label>
+        </div>
+        <div id="expProgress" hidden>
+          <div class="bar"><div id="expFill"></div></div>
+          <p id="expMsg"></p>
+        </div>
+        <p id="expError" class="error" hidden></p>
+      </div>
+
+      <div id="expUpload" hidden>
+        <p class="hint">GeoTIFF of the asset at risk, e.g. WorldPop population count,
+          built-up area (WSF/GHSL) or agricultural land (ESA WorldCover).</p>
+        <label class="dropzone" id="dzExposure">
+          <input type="file" id="fileExposure" accept=".tif,.tiff" hidden>
+          <span>Drop GeoTIFF here or <u>browse</u></span>
+        </label>
+      </div>
       <div id="exposureInfo" class="fileinfo" hidden></div>
       <div class="fieldrow">
         <label>Category

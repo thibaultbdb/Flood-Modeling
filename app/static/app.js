@@ -216,18 +216,81 @@ wireDrop('dzExposure', 'fileExposure', async (files) => {
     fd.append('session_id', sid);
     fd.append('file', f);
     const r = await api('/api/upload/exposure', { method: 'POST', body: fd });
-    state.exposure = r;
     setZoneState('dzExposure', f.name, true);
-    $('exposureInfo').hidden = false;
-    $('exposureInfo').innerHTML =
-      `<b>${r.meta.width}×${r.meta.height}</b> px · CRS <b>${r.meta.crs}</b>` +
-      `<span class="warn">Results are computed on this raster's grid; hazard layers are reprojected onto it.</span>`;
-    $('step3').classList.add('done');
+    setExposureInfo(r, f.name);
   } catch (e) {
     setZoneState('dzExposure', 'Drop GeoTIFF here or <u>browse</u>', false);
     showError(`Exposure: ${e.message}`);
   }
   refreshRunButton();
+});
+
+/* Exposure: download by country (as CCDR-tools does) vs upload a raster */
+function showExpTab(auto) {
+  $('tabAuto').classList.toggle('active', auto);
+  $('tabUpload').classList.toggle('active', !auto);
+  $('expAuto').hidden = !auto;
+  $('expUpload').hidden = auto;
+}
+$('tabAuto').addEventListener('click', () => showExpTab(true));
+$('tabUpload').addEventListener('click', () => showExpTab(false));
+
+function setExposureInfo(r, source) {
+  state.exposure = r;
+  $('exposureInfo').hidden = false;
+  $('exposureInfo').innerHTML =
+    `${source} — <b>${r.meta.width}×${r.meta.height}</b> px · CRS <b>${r.meta.crs}</b>` +
+    `<span class="warn">Results are computed on this raster's grid; hazard layers are reprojected onto it.</span>`;
+  $('step3').classList.add('done');
+  refreshRunButton();
+}
+
+$('iso3').addEventListener('input', () => {
+  $('iso3').value = $('iso3').value.toUpperCase().replace(/[^A-Z]/g, '');
+});
+$('iso3').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('fetchExp').click(); });
+
+$('fetchExp').addEventListener('click', async () => {
+  const iso3 = $('iso3').value.trim();
+  $('expError').hidden = true;
+  if (iso3.length !== 3) {
+    $('expError').textContent = 'Enter a 3-letter ISO country code, e.g. NGA.';
+    $('expError').hidden = false;
+    return;
+  }
+  $('fetchExp').disabled = true;
+  $('expProgress').hidden = false;
+  $('expFill').style.width = '0%';
+  $('expMsg').textContent = 'Contacting WorldPop…';
+  try {
+    const sid = await ensureSession();
+    const r = await api('/api/exposure/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sid, iso3 }),
+    });
+    const poll = async () => {
+      const s = await api(`/api/exposure/fetch/${r.job_id}`);
+      $('expFill').style.width = `${s.progress}%`;
+      $('expMsg').textContent = s.message;
+      if (s.status === 'running') return setTimeout(poll, 900);
+      $('fetchExp').disabled = false;
+      if (s.status === 'error') {
+        $('expError').textContent = s.error;
+        $('expError').hidden = false;
+        $('expProgress').hidden = true;
+        return;
+      }
+      $('expProgress').hidden = true;
+      setExposureInfo(s.result, `WorldPop population for <b>${iso3}</b>`);
+    };
+    poll();
+  } catch (e) {
+    $('fetchExp').disabled = false;
+    $('expProgress').hidden = true;
+    $('expError').textContent = e.message;
+    $('expError').hidden = false;
+  }
 });
 
 /* ------------------------------------------------------------ settings --- */

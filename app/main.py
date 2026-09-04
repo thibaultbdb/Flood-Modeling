@@ -27,6 +27,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from analysis import detect_return_period, run_flood_analysis
+from exposure_sources import ExposureFetchError, fetch_worldpop_population
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("FRM_DATA_DIR", os.path.join(BASE_DIR, "..", "data"))
@@ -218,6 +219,66 @@ async def upload_exposure(session_id: str = Form(...), file: UploadFile = File(.
         raise HTTPException(400, f"Not a readable GeoTIFF ({e}).")
     sess["exposure"] = {"path": path, "filename": fname, "meta": meta}
     return {"filename": fname, "meta": meta}
+
+
+@app.post("/api/exposure/fetch")
+def fetch_exposure(payload: dict):
+    """
+    Download population exposure for an ISO3 country code, as CCDR-tools does,
+    instead of requiring an upload. Runs as a background job so the UI can show
+    progress -- these rasters are tens to hundreds of MB.
+    """
+    sid = payload.get("session_id")
+    sess = _session(sid)
+    iso3 = (payload.get("iso3") or "").strip()
+
+    job_id = uuid.uuid4().hex[:12]
+    job = {"status": "running", "progress": 0, "message": f"Contacting WorldPop…",
+           "error": None, "kind": "exposure_fetch"}
+    JOBS[job_id] = job
+
+    edir = os.path.join(sess["dir"], "exposure")
+    dest = os.path.join(edir, f"{iso3.upper()}_POP.tif")
+
+    def worker():
+        def on_bytes(done, total):
+            mb = done / 1e6
+            if total:
+                job["progress"] = min(99, int(done / total * 100))
+                job["message"] = f"Downloading {iso3.upper()} population: {mb:.0f} / {total/1e6:.0f} MB"
+            else:
+                job["message"] = f"Downloading {iso3.upper()} population: {mb:.0f} MB"
+        try:
+            shutil.rmtree(edir, ignore_errors=True)
+            fetch_worldpop_population(iso3, dest, progress=on_bytes)
+            with rasterio.open(dest) as src:
+                meta = {"crs": str(src.crs), "width": src.width, "height": src.height,
+                        "res": [abs(src.transform.a), abs(src.transform.e)],
+                        "nodata": src.nodata}
+            sess["exposure"] = {"path": dest, "filename": os.path.basename(dest), "meta": meta}
+            job["result"] = {"filename": os.path.basename(dest), "meta": meta}
+            job["status"] = "done"
+            job["progress"] = 100
+            job["message"] = "Population exposure ready."
+        except ExposureFetchError as e:
+            job["status"] = "error"; job["error"] = str(e); job["message"] = str(e)
+        except Exception as e:
+            job["status"] = "error"
+            job["error"] = f"Downloaded file is not a readable GeoTIFF ({e})."
+            job["message"] = job["error"]
+
+    threading.Thread(target=worker, daemon=True).start()
+    return {"job_id": job_id}
+
+
+@app.get("/api/exposure/fetch/{job_id}")
+def fetch_exposure_status(job_id: str):
+    job = JOBS.get(job_id)
+    if not job or job.get("kind") != "exposure_fetch":
+        raise HTTPException(404, "Unknown download job.")
+    return {"status": job["status"], "progress": job["progress"],
+            "message": job["message"], "error": job["error"],
+            "result": job.get("result")}
 
 
 # -------------------------------------------------------------------- run ---

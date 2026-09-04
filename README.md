@@ -54,7 +54,12 @@ Then, in the browser, upload from `tests/sample_data/`:
 Press **Run flood risk analysis**. Results appear in a few seconds.
 
 Already have the dependencies installed? `./run.sh` starts the server on its own.
-To verify the analysis engine independently: `python3 tests/test_analysis.py`.
+To verify independently: `python3 tests/test_analysis.py` (analysis engine) and
+`python3 tests/test_exposure_fetch.py` (exposure download, against a local
+stand-in — no network needed).
+
+If `data.worldpop.org` is blocked on your network, set `FRM_WORLDPOP_BASE` to a
+mirror, or use the *Upload a raster* tab.
 
 ### Using your own data
 
@@ -66,11 +71,12 @@ Swap in your own files at the same three steps:
 - **Boundaries** — your admin units, zipped with the `.shp`, `.dbf`, `.shx` and
   `.prj` together (the `.prj` matters — without it the CRS is unknown and the
   upload is rejected).
-- **Exposure** — this one has no default and must be supplied. It is what the
-  hazard acts upon, so without it there is no risk to compute. Common sources:
-  [WorldPop](https://www.worldpop.org) 100 m population count, the
-  [GHSL](https://human-settlement.emergency.copernicus.eu) built-up surface, or
-  [ESA WorldCover](https://esa-worldcover.org) cropland for agriculture.
+- **Exposure** — for population, just type the **ISO3 country code** (`NGA`,
+  `BGD`, `MOZ`…) and the WorldPop 2020 UN-adjusted constrained 100 m raster is
+  downloaded for you, exactly as CCDR-tools does it. For built-up or
+  agricultural exposure, switch to the *Upload a raster* tab and supply your own
+  — e.g. [GHSL](https://human-settlement.emergency.copernicus.eu) built-up
+  surface or [ESA WorldCover](https://esa-worldcover.org) cropland.
 
 Nothing needs to share a grid or CRS; hazard layers are warped onto the exposure
 grid automatically, and the exposure raster sets the analysis resolution.
@@ -81,7 +87,7 @@ grid automatically, and the exposure raster sets the analysis resolution.
 |---|---|---|---|
 | 1 | Administrative boundaries | zipped shapefile (`.zip` containing `.shp`/`.dbf`/`.shx`/`.prj`), GeoJSON or GeoPackage | Must carry a CRS. You then pick the *code* and *name* attribute fields (auto-guessed). |
 | 2 | Flood hazard | one GeoTIFF per return period | Return periods are auto-detected from filenames (`1in100.tif`, `RP_100.tif`, `100yr.tif`) and editable in the table. |
-| 3 | Exposure | GeoTIFF | Population count, built-up area, or agricultural land. |
+| 3 | Exposure | ISO3 country code, or a GeoTIFF | Population downloads automatically from WorldPop by country code; built-up and agricultural exposure are uploaded. |
 
 **Fathom v3 layout.** Fathom ships one file per return period per scenario, e.g.
 `FLUVIAL_UNDEFENDED/2020/1in5.tif … 1in1000.tif`. Upload the set for the single
@@ -205,9 +211,18 @@ tables.
 
 Deliberate, and worth knowing:
 
-1. **You supply all inputs.** The notebook downloads boundaries (GADM/WB) and default
-   exposure (WorldPop/WSF/ESA) by ISO3 country code. Here everything is uploaded, so
-   the tool works for any area of interest, including non-country study areas.
+0. **The notebook's agriculture download is not reproduced, because it is
+   wrong.** `fetch_agri_data()` in `input_utils.py` requests the *population*
+   dataset and saves it as `{country}_AGR.tif`, so the notebook's "agriculture"
+   exposure is mislabelled population data. Upload a real cropland raster
+   instead.
+
+1. **Boundaries are always supplied by you.** The notebook downloads them
+   (GADM/WB) by ISO3 country code; here you upload them, so the tool works for any
+   area of interest, including non-country study areas and custom boundaries.
+   Population exposure *is* downloaded by country code as in the notebook;
+   built-up and agricultural exposure are uploaded rather than fetched (the
+   notebook pulls built-up from a WSF STAC search, which is not reproduced).
 2. **Flood only.** Tropical cyclones, the custom-hazard and bivariate workflows, and
    the climate-scenario folder conventions are not included, as requested.
 3. **Zonal statistics** are computed per feature with an explicit rasterised mask
