@@ -29,20 +29,51 @@ but replaces the notebook with a browser UI where every input is simply uploaded
 
 ## Quick start
 
-```bash
-pip install -r requirements.txt
-./run.sh                 # -> http://127.0.0.1:8000
-```
-
-No data to hand? Generate a synthetic sample set and try the whole flow:
+Requires Python 3.9+ and nothing else — the dependencies ship as wheels, so no
+system GDAL install is needed.
 
 ```bash
-python3 tests/make_sample_data.py
-# then upload from tests/sample_data/:
-#   boundaries.zip   -> step 1
-#   1in*.tif         -> step 2
-#   population.tif   -> step 3
+git clone https://github.com/thibaultbdb/Flood-Modeling
+cd Flood-Modeling
+git checkout claude/flood-risk-mapping-platform-l0ixtw
+./quickstart.sh
 ```
+
+That creates a virtualenv, installs the dependencies, generates a synthetic
+sample dataset, and starts the server on <http://127.0.0.1:8000>. It takes about
+a minute on a first run and is safe to re-run.
+
+Then, in the browser, upload from `tests/sample_data/`:
+
+| Step | File(s) |
+|---|---|
+| 1. Boundaries | `boundaries.zip` |
+| 2. Hazard | `1in5.tif` … `1in1000.tif` (select all eight at once) |
+| 3. Exposure | `population.tif` |
+
+Press **Run flood risk analysis**. Results appear in a few seconds.
+
+Already have the dependencies installed? `./run.sh` starts the server on its own.
+To verify the analysis engine independently: `python3 tests/test_analysis.py`.
+
+### Using your own data
+
+Swap in your own files at the same three steps:
+
+- **Hazard** — your Fathom v3 GeoTIFFs, one per return period, for a single
+  hazard type / period / scenario. Depths are centimetres in Fathom v3, which is
+  the default; switch the *Depth unit* selector if yours are in metres.
+- **Boundaries** — your admin units, zipped with the `.shp`, `.dbf`, `.shx` and
+  `.prj` together (the `.prj` matters — without it the CRS is unknown and the
+  upload is rejected).
+- **Exposure** — this one has no default and must be supplied. It is what the
+  hazard acts upon, so without it there is no risk to compute. Common sources:
+  [WorldPop](https://www.worldpop.org) 100 m population count, the
+  [GHSL](https://human-settlement.emergency.copernicus.eu) built-up surface, or
+  [ESA WorldCover](https://esa-worldcover.org) cropland for agriculture.
+
+Nothing needs to share a grid or CRS; hazard layers are warped onto the exposure
+grid automatically, and the exposure raster sets the analysis resolution.
 
 ## Inputs
 
