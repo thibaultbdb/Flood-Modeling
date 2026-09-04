@@ -1,0 +1,11 @@
+# Runtime data (uploads, job outputs)
+data/
+
+# Generated sample data
+tests/sample_data/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store

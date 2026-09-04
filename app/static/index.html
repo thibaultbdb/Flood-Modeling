@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flood Risk Mapping Platform</title>
+<link rel="icon" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/vendor/leaflet.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">🌊</span>
+    <div>
+      <h1>Flood Risk Mapping Platform</h1>
+      <p>Fathom v3 hazard × exposure analysis — CCDR-tools methodology</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <aside id="panel">
+
+    <!-- STEP 1 : Boundaries -->
+    <section class="step" id="step1">
+      <h2><span class="num">1</span> Administrative boundaries</h2>
+      <p class="hint">Zipped shapefile (.zip with .shp, .dbf, .shx, .prj), GeoJSON or GeoPackage.</p>
+      <label class="dropzone" id="dzBoundaries">
+        <input type="file" id="fileBoundaries" accept=".zip,.geojson,.json,.gpkg" hidden>
+        <span>Drop file here or <u>browse</u></span>
+      </label>
+      <div id="boundariesInfo" class="fileinfo" hidden></div>
+      <div class="fieldrow" id="fieldPickers" hidden>
+        <label>Unit code field
+          <select id="codeField"></select>
+        </label>
+        <label>Unit name field
+          <select id="nameField"></select>
+        </label>
+      </div>
+    </section>
+
+    <!-- STEP 2 : Hazard -->
+    <section class="step" id="step2">
+      <h2><span class="num">2</span> Fathom flood hazard</h2>
+      <p class="hint">One GeoTIFF per return period (e.g. <code>1in10.tif</code>, <code>1in100.tif</code>).
+        Return periods are auto-detected from filenames — adjust if needed.</p>
+      <label class="dropzone" id="dzHazard">
+        <input type="file" id="fileHazard" accept=".tif,.tiff" multiple hidden>
+        <span>Drop GeoTIFF(s) here or <u>browse</u></span>
+      </label>
+      <table id="hazardTable" class="haztable" hidden>
+        <thead><tr><th>File</th><th>Return period (years)</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="fieldrow">
+        <label>Depth unit
+          <select id="hazardUnit">
+            <option value="cm" selected>centimetres (Fathom v3)</option>
+            <option value="m">metres</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <!-- STEP 3 : Exposure -->
+    <section class="step" id="step3">
+      <h2><span class="num">3</span> Exposure</h2>
+      <p class="hint">GeoTIFF of the asset at risk, e.g. WorldPop population count,
+        built-up area (WSF/GHSL) or agricultural land (ESA).</p>
+      <label class="dropzone" id="dzExposure">
+        <input type="file" id="fileExposure" accept=".tif,.tiff" hidden>
+        <span>Drop GeoTIFF here or <u>browse</u></span>
+      </label>
+      <div id="exposureInfo" class="fileinfo" hidden></div>
+      <div class="fieldrow">
+        <label>Category
+          <select id="expCat">
+            <option value="POP" selected>Population (mortality function)</option>
+            <option value="BU">Built-up (damage function)</option>
+            <option value="AGR">Agriculture (damage function)</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <!-- STEP 4 : Settings -->
+    <section class="step" id="step4">
+      <h2><span class="num">4</span> Analysis settings</h2>
+      <div class="fieldrow">
+        <label>Approach
+          <select id="analysisType">
+            <option value="Function" selected>Impact function (EAI)</option>
+            <option value="Classes">Hazard classes (EAE)</option>
+          </select>
+        </label>
+        <label>Min. hazard threshold (cm)
+          <input type="number" id="threshold" value="20" min="0" max="200" step="1">
+        </label>
+      </div>
+      <div class="fieldrow">
+        <label>Pixel selection <span class="tip" title="Cell centre = only pixels whose centre falls inside the unit (rasterstats default, used by CCDR-tools for the per-return-period statistics). All touched = every pixel the polygon touches; safer for admin units smaller than a few pixels.">?</span>
+          <select id="allTouched">
+            <option value="false" selected>Cell centre (CCDR default)</option>
+            <option value="true">All touched pixels</option>
+          </select>
+        </label>
+      </div>
+      <div class="fieldrow" id="regionRow">
+        <label>World Bank region <span class="tip" title="Selects the regional Huizinga et al. (2017) damage curve for built-up and agriculture. Population mortality uses a global curve.">?</span>
+          <select id="wbRegion">
+            <option value="AFR">Sub-Saharan Africa</option>
+            <option value="MENA">Middle East &amp; North Africa</option>
+            <option value="EAP">East Asia &amp; Pacific</option>
+            <option value="SAR">South Asia</option>
+            <option value="ECA">Europe &amp; Central Asia</option>
+            <option value="LCR">Latin America &amp; Caribbean</option>
+            <option value="Other" selected>Other (global curve)</option>
+          </select>
+        </label>
+      </div>
+      <div id="classEdgesBox" hidden>
+        <p class="hint">Class thresholds in cm (ascending). Class C1 = depth ≥ edge 1, etc.</p>
+        <div id="classEdges"></div>
+        <button type="button" class="ghost" id="addEdge">+ Add class edge</button>
+      </div>
+    </section>
+
+    <!-- RUN -->
+    <section class="step" id="stepRun">
+      <button id="runBtn" disabled>Run flood risk analysis</button>
+      <div id="progressBox" hidden>
+        <div class="bar"><div id="progressFill"></div></div>
+        <p id="progressMsg"></p>
+      </div>
+      <p id="runError" class="error" hidden></p>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="step" id="stepResults" hidden>
+      <h2><span class="num">✓</span> Results</h2>
+      <div class="fieldrow">
+        <label>Map indicator
+          <select id="mapColumn"></select>
+        </label>
+      </div>
+      <div class="downloads">
+        <a id="dlXlsx" class="ghost" download>Excel</a>
+        <a id="dlCsv" class="ghost" download>CSV</a>
+        <a id="dlGpkg" class="ghost" download>GeoPackage</a>
+        <a id="dlGeojson" class="ghost" download>GeoJSON</a>
+      </div>
+      <div class="chartbox"><canvas id="chart"></canvas></div>
+      <h3>Summary (whole area)</h3>
+      <div class="tablewrap"><table id="summaryTable"></table></div>
+      <h3>Per admin unit</h3>
+      <div class="tablewrap tall"><table id="resultsTable"></table></div>
+    </section>
+  </aside>
+
+  <div id="map"></div>
+</main>
+
+<script src="/static/vendor/leaflet.js"></script>
+<script src="/static/vendor/chart.umd.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
