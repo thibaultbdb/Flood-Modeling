@@ -170,6 +170,30 @@ def test_single_return_period():
     check(len(summary) == 1, "summary has one row")
 
 
+def test_pixel_modes():
+    """Cell-centre totals must partition the raster exactly; all_touched must not."""
+    print("\nPixel-selection modes")
+    import rasterio
+    adm = gpd.read_file(os.path.join(DATA, "boundaries.shp"))
+    haz = [{"path": os.path.join(DATA, "1in100.tif"), "rp": 100}]
+    exp = os.path.join(DATA, "population.tif")
+    with rasterio.open(exp) as src:
+        arr = src.read(1)
+        true_total = float(arr[arr > 0].sum())
+
+    centre, _, _ = run_flood_analysis(adm, "HASC_2", "NAM_2", haz, exp, "POP", "Function",
+                                      min_haz_threshold=20.0, wb_region="AFR",
+                                      total_all_touched=False)
+    ccdr, _, _ = run_flood_analysis(adm, "HASC_2", "NAM_2", haz, exp, "POP", "Function",
+                                    min_haz_threshold=20.0, wb_region="AFR",
+                                    total_all_touched=True)
+    c_tot = float(centre["ADM_POP"].sum())
+    k_tot = float(ccdr["ADM_POP"].sum())
+    check(abs(c_tot - true_total) / true_total < 1e-4,
+          f"cell-centre totals partition the raster exactly ({c_tot:,.0f} vs {true_total:,.0f})")
+    check(k_tot >= c_tot, "all_touched totals are >= cell-centre totals (boundary pixels shared)")
+
+
 def test_validation_errors():
     print("\nInput validation")
     adm = gpd.read_file(os.path.join(DATA, "boundaries.shp"))
@@ -191,7 +215,8 @@ if __name__ == "__main__":
     ensure_data()
     for fn in (test_rp_detection, test_exceedance_frequencies, test_damage_functions,
                test_zonal_sum, test_function_analysis, test_classes_analysis,
-               test_threshold_and_units, test_single_return_period, test_validation_errors):
+               test_threshold_and_units, test_single_return_period, test_pixel_modes,
+               test_validation_errors):
         fn()
     print("\n" + "=" * 60)
     if failures:

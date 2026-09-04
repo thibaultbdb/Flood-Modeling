@@ -38,7 +38,7 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 SESSIONS = {}   # sid -> dict(dir, boundaries, hazards, exposure)
 JOBS = {}       # job_id -> dict(status, progress, message, error, results…)
 
-MAX_PREVIEW_FEATURES = 5000
+MAX_PREVIEW_FEATURES = 20000  # verified responsive at 10k admin units
 
 
 def _session(sid):
@@ -265,7 +265,14 @@ async def run_analysis_endpoint(payload: dict):
     hazard_unit = payload.get("hazard_unit", "cm")
     if hazard_unit not in ("cm", "m"):
         raise HTTPException(400, "hazard_unit must be 'cm' or 'm'.")
-    all_touched = bool(payload.get("all_touched", False))
+    # Pixel selection. "ccdr" reproduces CCDR-tools exactly (all_touched for the
+    # admin totals, cell-centre per return period); "centre" makes both an exact
+    # partition of the raster; "all_touched" counts every touched pixel.
+    pixel_mode = payload.get("pixel_mode", "ccdr")
+    if pixel_mode not in ("ccdr", "centre", "all_touched"):
+        raise HTTPException(400, "pixel_mode must be ccdr, centre or all_touched.")
+    all_touched = pixel_mode == "all_touched"
+    total_all_touched = pixel_mode in ("ccdr", "all_touched")
 
     job_id = uuid.uuid4().hex[:12]
     job = {"status": "running", "progress": 0, "message": "Starting…",
@@ -290,7 +297,8 @@ async def run_analysis_endpoint(payload: dict):
                 min_haz_threshold=threshold,
                 class_edges=[float(c) for c in class_edges] if class_edges else None,
                 wb_region=wb_region, hazard_unit=hazard_unit,
-                all_touched=all_touched, progress=progress,
+                all_touched=all_touched, total_all_touched=total_all_touched,
+                progress=progress,
             )
             # Persist outputs
             out = job["dir"]

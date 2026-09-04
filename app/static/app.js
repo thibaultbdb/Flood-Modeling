@@ -306,7 +306,7 @@ $('runBtn').addEventListener('click', async () => {
       class_edges: getClassEdges(),
       wb_region: $('wbRegion').value,
       hazard_unit: $('hazardUnit').value,
-      all_touched: $('allTouched').value === 'true',
+      pixel_mode: $('pixelMode').value,
     };
     const r = await api('/api/run', {
       method: 'POST',

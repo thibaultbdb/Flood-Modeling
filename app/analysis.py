@@ -5,6 +5,12 @@ Replicates the flood (FL) branch of GFDRR CCDR-tools `runAnalysis.py`:
 
 1. Load exposure raster (population / built-up / agriculture), clean nodata.
 2. Compute total exposure per admin unit (zonal sum, all_touched=True).
+   Note: CCDR-tools uses all_touched=True here but the rasterstats default
+   (False) for the per-return-period statistics below. That is reproduced by
+   default, but it means boundary pixels are counted in every unit they touch,
+   inflating the totals -- and so the EAI%/EAE% denominators -- where units are
+   small relative to the pixel size. `total_all_touched=False` makes the totals
+   an exact partition of the raster instead.
 3. For each return period, warp the Fathom hazard raster onto the exposure
    grid (WarpedVRT, nearest resampling), apply the minimum hazard threshold,
    then either:
@@ -178,6 +184,7 @@ def run_flood_analysis(
     wb_region='Other',
     hazard_unit='cm',         # 'cm' | 'm'
     all_touched=False,        # pixel selection for the per-RP zonal statistics
+    total_all_touched=True,   # pixel selection for the admin-unit exposure totals
     progress=None,            # callable(pct: int, message: str)
 ):
     """Returns (result_gdf, summary_df, prob_df)."""
@@ -217,7 +224,7 @@ def run_flood_analysis(
     geoms = list(adm_in_exp.geometry.values)
 
     report(12, "Computing total exposure per admin unit…")
-    total_exp = zonal_sum(exp_data, geoms, transform, all_touched=True)
+    total_exp = zonal_sum(exp_data, geoms, transform, all_touched=total_all_touched)
 
     result_df = pd.DataFrame({
         code_field: adm_gdf[code_field].values,

@@ -75,9 +75,22 @@ does. The exposure raster's grid therefore defines the analysis resolution.
 - **World Bank region** — selects the regional damage curve for built-up and
   agriculture. Population mortality uses a single global curve, so this is hidden
   for population.
-- **Pixel selection** — *Cell centre* (rasterstats' default, what CCDR-tools uses for
-  its per-return-period statistics) or *All touched*. Use *All touched* when admin
-  units are only a few pixels across.
+- **Pixel selection** — how raster cells are assigned to admin units:
+  - *CCDR-compatible* (default) — reproduces CCDR-tools exactly: every touched
+    pixel for the admin-unit totals, cell-centre for the per-return-period
+    statistics. Note the consequence: boundary pixels are counted in **every**
+    unit they touch, so the totals — and therefore the `EAI%`/`EAE%`
+    denominators — are inflated where units are small relative to the pixel. In
+    testing, 2,025 units over a 100 m grid inflated the total by 2.0%.
+  - *Exact partition (cell centre)* — cell-centre throughout, so every pixel is
+    counted exactly once and the totals sum to the true raster total. Choose this
+    if you care about the percentage indicators.
+  - *All touched* — every touched pixel throughout; maximises coverage when units
+    are smaller than a few pixels, at the cost of double-counting boundaries.
+
+  The absolute EAI/EAE and per-return-period impacts are **identical** under
+  *CCDR-compatible* and *Exact partition* — only the totals and the percentage
+  indicators differ.
 
 ## Methodology
 
@@ -127,6 +140,22 @@ Reproduced verbatim from CCDR-tools (`damageFunctions.py`); depth *x* in metres:
 | Built-up (`BU`) | regional sigmoid (Africa / Asia / LAC / Global) | Huizinga et al. (2017), EU-JRC |
 | Agriculture (`AGR`) | regional sigmoid (Africa / Asia / LAC / Global) | Huizinga et al. (2017), EU-JRC |
 
+## Performance
+
+Measured on 4 cores / 15 GB RAM, with 8 return periods of Fathom-like 30 m hazard
+(12,000 × 12,000 px each) against a 100 m exposure raster (4,000 × 4,000 px):
+
+| Admin units | Analysis | End-to-end in browser | Peak memory |
+|---|---|---|---|
+| 2,025 | 36 s | 40 s | 0.9 GB |
+| 10,000 | 104 s | 129 s | 0.9 GB |
+
+Memory is flat in the number of units because the exposure raster is windowed to
+the boundary extent and each return period is processed and released in turn;
+runtime grows roughly linearly with units × return periods. Boundaries are capped
+at 20,000 features — beyond roughly 10,000 the browser map, not the analysis,
+becomes the slow part.
+
 ## Outputs
 
 Per administrative unit: total exposure, exposed and impacted exposure for every
@@ -157,9 +186,11 @@ Deliberate, and worth knowing:
 4. **Single-process.** No dask/multiprocess. The exposure raster is windowed to the
    boundary extent, which keeps typical national runs comfortable in memory, but a
    very large area at 30 m will be slower than the parallel notebook.
-5. `all_touched` is exposed as a setting. CCDR-tools is internally inconsistent here
-   (`True` for admin totals, rasterstats' default `False` for per-return-period
-   stats); the default reproduces that behaviour exactly.
+5. **Pixel selection is exposed as a setting.** CCDR-tools is internally
+   inconsistent here — `all_touched=True` for admin totals but rasterstats'
+   default `False` for the per-return-period statistics — which inflates the
+   totals used as the `EAI%` denominator. The default reproduces that behaviour
+   exactly for comparability; *Exact partition* corrects it.
 
 ## Project layout
 
@@ -188,7 +219,7 @@ never requires network access.
   internet without adding authentication and upload limits.
 - The upload path holds the whole exposure raster window in memory. For very large
   rasters, clip to your area of interest first.
-- Boundaries are capped at 5000 features to keep the browser map responsive.
+- Boundaries are capped at 20,000 features. See **Performance** above.
 
 ## Licence and attribution
 

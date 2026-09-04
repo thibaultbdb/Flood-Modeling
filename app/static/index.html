@@ -100,10 +100,11 @@
         </label>
       </div>
       <div class="fieldrow">
-        <label>Pixel selection <span class="tip" title="Cell centre = only pixels whose centre falls inside the unit (rasterstats default, used by CCDR-tools for the per-return-period statistics). All touched = every pixel the polygon touches; safer for admin units smaller than a few pixels.">?</span>
-          <select id="allTouched">
-            <option value="false" selected>Cell centre (CCDR default)</option>
-            <option value="true">All touched pixels</option>
+        <label>Pixel selection <span class="tip" title="CCDR-compatible reproduces CCDR-tools exactly: every touched pixel for the admin totals, cell-centre per return period. Because boundary pixels then count in both neighbouring units, totals (and so the EAI%/EAE% denominators) are inflated where units are small relative to the pixel. Exact partition uses cell-centre throughout, so each pixel counts once. All touched maximises coverage for units smaller than a few pixels.">?</span>
+          <select id="pixelMode">
+            <option value="ccdr" selected>CCDR-compatible</option>
+            <option value="centre">Exact partition (cell centre)</option>
+            <option value="all_touched">All touched pixels</option>
           </select>
         </label>
       </div>
