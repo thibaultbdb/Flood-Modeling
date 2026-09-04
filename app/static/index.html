@@ -76,9 +76,10 @@
 
       <div id="expAuto">
         <div class="fieldrow">
-          <label>Country ISO3 code <span class="tip" title="Three-letter ISO country code, e.g. NGA (Nigeria), BGD (Bangladesh), MOZ (Mozambique). Fetches the WorldPop 2020 UN-adjusted constrained 100 m population count -- the same dataset CCDR-tools uses.">?</span>
-            <input type="text" id="iso3" placeholder="e.g. NGA" maxlength="3"
-                   autocapitalize="characters" spellcheck="false">
+          <label>Country <span class="tip" title="Downloads the WorldPop 2020 UN-adjusted constrained 100 m population count for this country - the same dataset CCDR-tools uses. Start typing a country name to jump to it.">?</span>
+            <select id="country">
+              <option value="" selected>Select a country…</option>
+            </select>
           </label>
           <label style="flex:0 0 auto;align-self:end">&nbsp;
             <button type="button" class="ghost" id="fetchExp">Download population</button>
@@ -191,6 +192,7 @@
 
 <script src="/static/vendor/leaflet.js"></script>
 <script src="/static/vendor/chart.umd.js"></script>
+<script src="/static/countries.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -27,39 +27,56 @@ own boundaries and exposure layers. That makes it awkward to run against data yo
 already have. This platform keeps the **same methodology and the same equations**
 but replaces the notebook with a browser UI where every input is simply uploaded.
 
-## Quick start
+## Quick start — no commands to type
 
-Requires Python 3.9+ and nothing else — the dependencies ship as wheels, so no
-system GDAL install is needed.
+**1. Install Python** (one time, like installing any app). Download it from
+[python.org/downloads](https://www.python.org/downloads/) and click through the
+installer. **On Windows, tick "Add python.exe to PATH" on the first screen.**
 
-```bash
-git clone https://github.com/thibaultbdb/Flood-Modeling
-cd Flood-Modeling
-git checkout claude/flood-risk-mapping-platform-l0ixtw
-./quickstart.sh
-```
+**2. Download this tool.** On the repository page, click the green **Code**
+button, then **Download ZIP**, and unzip it.
 
-That creates a virtualenv, installs the dependencies, generates a synthetic
-sample dataset, and starts the server on <http://127.0.0.1:8000>. It takes about
-a minute on a first run and is safe to re-run.
+**3. Double-click the launcher** inside the unzipped folder:
 
-Then, in the browser, upload from `tests/sample_data/`:
+| Your computer | Double-click |
+|---|---|
+| Mac | `Start-Flood-Tool.command` |
+| Windows | `Start-Flood-Tool.bat` |
+
+A black window opens and sets things up — about a minute the first time, a few
+seconds after that — then your browser opens the tool automatically. Leave the
+black window open while you work; closing it stops the tool.
+
+> **Mac note:** if double-clicking does nothing, right-click the file and choose
+> **Open**, then **Open** again on the warning. macOS asks this once for files
+> downloaded from the internet.
+
+The first run also creates example data in `tests/sample_data`, so you can
+practise the whole workflow before using real files:
 
 | Step | File(s) |
 |---|---|
 | 1. Boundaries | `boundaries.zip` |
 | 2. Hazard | `1in5.tif` … `1in1000.tif` (select all eight at once) |
-| 3. Exposure | `population.tif` |
+| 3. Exposure | pick any country, or upload `population.tif` |
 
-Press **Run flood risk analysis**. Results appear in a few seconds.
+Then press **Run flood risk analysis**.
 
-Already have the dependencies installed? `./run.sh` starts the server on its own.
-To verify independently: `python3 tests/test_analysis.py` (analysis engine) and
-`python3 tests/test_exposure_fetch.py` (exposure download, against a local
-stand-in — no network needed).
+<details>
+<summary>Prefer the command line?</summary>
+
+```bash
+./quickstart.sh          # sets up and starts everything
+./run.sh                 # if dependencies are already installed
+python3 tests/test_analysis.py        # verify the analysis engine
+python3 tests/test_exposure_fetch.py  # verify the download (no network needed)
+python3 tests/test_dependencies.py    # verify nothing is undeclared
+```
 
 If `data.worldpop.org` is blocked on your network, set `FRM_WORLDPOP_BASE` to a
 mirror, or use the *Upload a raster* tab.
+
+</details>
 
 ### Using your own data
 
@@ -71,9 +88,9 @@ Swap in your own files at the same three steps:
 - **Boundaries** — your admin units, zipped with the `.shp`, `.dbf`, `.shx` and
   `.prj` together (the `.prj` matters — without it the CRS is unknown and the
   upload is rejected).
-- **Exposure** — for population, just type the **ISO3 country code** (`NGA`,
-  `BGD`, `MOZ`…) and the WorldPop 2020 UN-adjusted constrained 100 m raster is
-  downloaded for you, exactly as CCDR-tools does it. For built-up or
+- **Exposure** — for population, just **pick your country from the dropdown**
+  and the WorldPop 2020 UN-adjusted constrained 100 m raster is downloaded for
+  you, exactly as CCDR-tools does it. For built-up or
   agricultural exposure, switch to the *Upload a raster* tab and supply your own
   — e.g. [GHSL](https://human-settlement.emergency.copernicus.eu) built-up
   surface or [ESA WorldCover](https://esa-worldcover.org) cropland.
@@ -87,7 +104,7 @@ grid automatically, and the exposure raster sets the analysis resolution.
 |---|---|---|---|
 | 1 | Administrative boundaries | zipped shapefile (`.zip` containing `.shp`/`.dbf`/`.shx`/`.prj`), GeoJSON or GeoPackage | Must carry a CRS. You then pick the *code* and *name* attribute fields (auto-guessed). |
 | 2 | Flood hazard | one GeoTIFF per return period | Return periods are auto-detected from filenames (`1in100.tif`, `RP_100.tif`, `100yr.tif`) and editable in the table. |
-| 3 | Exposure | ISO3 country code, or a GeoTIFF | Population downloads automatically from WorldPop by country code; built-up and agricultural exposure are uploaded. |
+| 3 | Exposure | a country from the dropdown, or a GeoTIFF | Population downloads automatically from WorldPop by country code; built-up and agricultural exposure are uploaded. |
 
 **Fathom v3 layout.** Fathom ships one file per return period per scenario, e.g.
 `FLUVIAL_UNDEFENDED/2020/1in5.tif … 1in1000.tif`. Upload the set for the single
@@ -241,6 +258,8 @@ Deliberate, and worth knowing:
 ## Project layout
 
 ```
+Start-Flood-Tool.command / .bat   double-click launchers (Mac / Windows)
+launch.py              what the launchers run: setup, start, open browser
 app/
   main.py              FastAPI backend: uploads, jobs, downloads
   analysis.py          analysis engine (the CCDR-tools port)

@@ -245,16 +245,16 @@ function setExposureInfo(r, source) {
   refreshRunButton();
 }
 
-$('iso3').addEventListener('input', () => {
-  $('iso3').value = $('iso3').value.toUpperCase().replace(/[^A-Z]/g, '');
-});
-$('iso3').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('fetchExp').click(); });
+// Populate the country picker (typing a name jumps to it in a native select)
+COUNTRIES.forEach((c) => $('country').add(new Option(`${c.n} (${c.c})`, c.c)));
+$('country').addEventListener('change', () => { $('expError').hidden = true; });
 
 $('fetchExp').addEventListener('click', async () => {
-  const iso3 = $('iso3').value.trim();
+  const iso3 = $('country').value;
+  const label = $('country').selectedOptions[0]?.text || iso3;
   $('expError').hidden = true;
-  if (iso3.length !== 3) {
-    $('expError').textContent = 'Enter a 3-letter ISO country code, e.g. NGA.';
+  if (!iso3) {
+    $('expError').textContent = 'Choose a country from the list first.';
     $('expError').hidden = false;
     return;
   }
@@ -269,20 +269,27 @@ $('fetchExp').addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sid, iso3 }),
     });
+    const failDownload = (msg) => {
+      $('fetchExp').disabled = false;
+      $('expProgress').hidden = true;
+      $('expError').textContent = msg;
+      $('expError').hidden = false;
+    };
     const poll = async () => {
-      const s = await api(`/api/exposure/fetch/${r.job_id}`);
+      // Any throw here must surface, or the progress bar hangs forever.
+      let s;
+      try {
+        s = await api(`/api/exposure/fetch/${r.job_id}`);
+      } catch (e) {
+        return failDownload(`Lost contact with the tool while downloading (${e.message}).`);
+      }
       $('expFill').style.width = `${s.progress}%`;
       $('expMsg').textContent = s.message;
       if (s.status === 'running') return setTimeout(poll, 900);
+      if (s.status === 'error') return failDownload(s.error);
       $('fetchExp').disabled = false;
-      if (s.status === 'error') {
-        $('expError').textContent = s.error;
-        $('expError').hidden = false;
-        $('expProgress').hidden = true;
-        return;
-      }
       $('expProgress').hidden = true;
-      setExposureInfo(s.result, `WorldPop population for <b>${iso3}</b>`);
+      setExposureInfo(s.result, `WorldPop population — <b>${label}</b>`);
     };
     poll();
   } catch (e) {
